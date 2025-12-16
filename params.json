@@ -1,0 +1,9 @@
+{
+  "reads_dir": "/path/to/reads",
+  "refs_dir": "/path/to/dataset/genus_species",
+  "outdir": "/path/to/output",
+  "threads": 16,
+  "memory_gb": 64,
+  "genus_species": "listeria_monocytogenes",
+  "tmap_outfmt": 0
+}
