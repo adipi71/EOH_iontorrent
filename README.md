@@ -53,7 +53,7 @@ docker info | head
 
 ```
 EOH_iontorrent/
-├── EOH_iontorrent_pipeline_final.nf
+├── EOH_iontorrent_pipeline_light.nf
 ├── nextflow.config
 └── params.json
 
@@ -255,7 +255,7 @@ Put in params.json
 ### Run the pipeline
 
 ```bash
-nextflow run EOH_iontorrent_pipeline_final.nf   -params-file params.json
+nextflow run EOH_iontorrent_pipeline_light.nf   -params-file params.json
 ```
 
 ## Output Structure
