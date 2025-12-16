@@ -3,14 +3,14 @@
 **Nextflow DSL2 – Reference-based assembly pipeline**
 
 
-## 1. Introduction
+## Introduction
 
 This pipeline implements a **complete, reference-based WGS workflow for IonTorrent bacterial data**
 
 Special attention has been given to:
 - IonTorrent-specific error profiles (homopolymers, indels)
 - generation of *ORF-preserving consensus genomes*
-- maximization of loci successfully called by chewBBACA
+- maximization of loci successfully called by an allele caller
 - full reproducibility via Docker containers
 
 The pipeline is written in **Nextflow DSL2** and is designed to be:
@@ -19,29 +19,27 @@ The pipeline is written in **Nextflow DSL2** and is designed to be:
 - easy to run on HPC or standalone servers
 
 
-## 2. Global Workflow Overview
+## Global Workflow Overview
 
 For each sample, the pipeline executes the following steps:
 
-1. **FASTP** – read trimming and quality control  
-2. **MASH** – selection of the closest reference genome  
-3. **Reference preparation** – copy and normalization of selected reference  
-4. **Read mapping** – Bowtie2  
-5. **Alignment processing** – SAM → BAM → sorted & indexed BAM  
-6. **Consensus reconstruction** – samtools + bcftools + vcfutils  
-7. **Consensus conversion** – FASTQ → FASTA  
-8. **chewBBACA** – cgMLST allele calling  
+* **MASH** – selection of the closest reference genome  
+* **Reference preparation** – copy and normalization of selected reference  
+* **Read mapping** – Bowtie2  
+* **Alignment processing** – SAM → BAM → sorted & indexed BAM  
+* **Consensus reconstruction** – samtools + bcftools + vcfutils  
+* **Consensus conversion** – FASTQ → FASTA  
 
 Each step is executed in an isolated Docker container.
 
 
-## 3. Requirements
+## Requirements
 
-### 3.1 Software
+### Software
 - **Nextflow ≥ 22.04**
 - **Docker**
 
-### 3.2 Verify installation
+### Verify installation
 ```bash
 nextflow -version
 docker --version
@@ -49,9 +47,9 @@ docker info | head
 ```
 
 
-## 4. Directory Structure
+## Directory Structure
 
-### 4.1 Project layout (recommended)
+### Project layout (recommended)
 
 ```
 EOH_iontorrent/
@@ -64,9 +62,9 @@ EOH_iontorrent/
 ```
 
 
-## 5. Input Data
+## Input Data
 
-### 5.1 Reads directory (`reads_dir`)
+### Reads directory (`reads_dir`)
 
 The pipeline expects **single-end IonTorrent WGS reads**.
 
@@ -90,7 +88,7 @@ reads/
 - Avoid spaces and special characters in file names
 
 
-### 5.2 Reference directory (`refs_dir`)
+### Reference directory (`refs_dir`)
 
 This directory must contain **candidate reference genomes** in FASTA format.
 
@@ -113,9 +111,9 @@ The pipeline uses **MASH** to:
 - select the **best reference per sample**
 
 
-## 6. Configuration (`params.json`)
+## Configuration (`params.json`)
 
-### 6.1 Example
+### Example
 ```json
 {
   "reads_dir": "path-to-reads",
@@ -127,7 +125,7 @@ The pipeline uses **MASH** to:
 }
 ```
 
-### 6.2 Parameter description
+### Parameter description
 
 | Parameter | Description |
 ||
@@ -136,26 +134,11 @@ The pipeline uses **MASH** to:
 | `outdir` | Output directory |
 | `threads` | Threads for multithreaded tools |
 | `memory_gb` | Memory allocation (GB) |
-| `genus_species` | Species identifier for chewBBACA schema |
 
 
-## 7. Detailed Process Description
+## Detailed Process Description
 
-### 7.1 FASTP – Read preprocessing
-
-**Input**
-- Raw reads in FASTQ format
-
-**Output**
-- Trimmed reads in FASTQ format
-- HTML and JSON QC reports
-
-**Purpose**
-- Remove low-quality bases
-- Generate quality metrics for traceability
-
-
-### 7.2 MASH – Reference selection
+### MASH – Reference selection
 
 **Input**
 - Trimmed reads in FASTQ format
@@ -169,7 +152,7 @@ The pipeline uses **MASH** to:
 - Automatically select the most appropriate reference for each sample
 
 
-### 7.3 Read Mapping (Bowtie2)
+### Read Mapping (Bowtie2)
 
 **Input**
 - Trimmed reads in FASTQ format
@@ -182,7 +165,7 @@ The pipeline uses **MASH** to:
 - Align IonTorrent reads to the closest reference genome
 
 
-### 7.4 Alignment processing (SAMTOOLS)
+### Alignment processing (SAMTOOLS)
 
 **Input**
 - SAM alignment file
@@ -194,7 +177,7 @@ The pipeline uses **MASH** to:
 - Prepare alignment for variant calling and consensus generation
 
 
-### 7.5 Consensus reconstruction (samtools + bcftools + vcfutils)
+### Consensus reconstruction (samtools + bcftools + vcfutils)
 
 **Input**
 - Sorted and indexed BAM file
@@ -211,7 +194,7 @@ The pipeline uses **MASH** to:
 This step is optimized for **IonTorrent WGS** and is intentionally conservative.
 
 
-### 7.6 FASTQ → FASTA conversion
+### FASTQ → FASTA conversion
 
 **Input**
 - Consensus as FASTQ format
@@ -220,51 +203,22 @@ This step is optimized for **IonTorrent WGS** and is intentionally conservative.
 - Consensus as FASTA format
 
 **Purpose**
-- Produce final genome sequence for chewBBACA
+- Produce final genome sequence 
 
-
-### 7.7 chewBBACA – Allele calling
-
-**Input**
-- Consensus as FASTA format
-- Folder of Species-specific schema
-
-**Output**
-- Allele profiles as TSV file
-- Statistics files 
-
-**Purpose**
-- cgMLST allele calling
-- Generate profiles for downstream epidemiological analysis
-
-
-### 7.8. chewBBACA Schema Selection
-
-The schema is selected automatically based on `genus_species`.
-
-| genus_species | Schema |
-|-|-|
-| listeria_monocytogenes | Pasteur cgMLST |
-| escherichia_coli | INNUENDO wgMLST |
-| salmonella_enterica | INNUENDO cgMLST |
-
-
-## 8. Output Structure
+## Output Structure
 
 ```
 results/SAMPLE/
-├── fastp/
 ├── mash/
 ├── ref/
 ├── mapping/
-├── consensus/
-└── chewbbaca/
+└── consensus/
 ```
 
 
-## 9. Downloading the Project and Example Data from GitHub
+## Downloading the Project and Example Data from GitHub
 
-### 9.1 Clone the repository
+### Clone the repository
 
 ```bash
 git clone https://github.com/adipi71/EOH_iontorrent.git
@@ -272,14 +226,14 @@ cd EOH_iontorrent
 ```
 
 
-### 9.2 Example data included
+### Example data included
 
 ```
 example_refs_listeria.zip
 ```
 
 
-### 9.3 Unzip example data
+### Unzip example data
 
 ```bash
 unzip example_refs_listeria.zip
@@ -298,35 +252,31 @@ Put in params.json
   "reads_dir": "path-to-reads",
 ```
 
-### 9.5 Run the pipeline
+### Run the pipeline
 
 ```bash
 nextflow run EOH_iontorrent_pipeline_final.nf   -params-file params.json
 ```
 
-## 10. Output Structure
+## Output Structure
 
 For each sample:
 
 ```
 outdir/SAMPLE/
-├── fastp/        # Trimmed reads in FASTQ format and QC reports
 ├── mash/         # reference selection results
 ├── ref/          # chosen reference genome
 ├── mapping/      # SAM/BAM/VCF/FASTQ files
-├── consensus/    # final consensus FASTA
-└── chewbbaca/    # allele calling results
+└── consensus/    # final consensus FASTA
 ```
 
 
-## 11. Docker Images and Tool Versions
+## Docker Images and Tool Versions
 
 Exact tool versions are defined in `nextflow.config`.
 
-fastp 1.0.1
 mash 2.3
 bowtie2-align version 2.1.0
 samtools 0.1.19-44428cd
-chewBBACA 2.8.5
 
 
