@@ -1,5 +1,6 @@
 nextflow.enable.dsl = 2
 
+
 // ================== PARAMS ==================
 
 params.threads   = (params.threads ?: 8)    as int
@@ -149,7 +150,6 @@ process SAMTOOLS_VCFUTILS_FASTQ {
   tag { basename }
   publishDir "${params.outdir}", mode: 'copy', saveAs: { fn -> "${basename}/mapping/${fn}" }
   label 'mapping'
-  containerOptions '-u 0:0'
   cpus 8
 
   input:
