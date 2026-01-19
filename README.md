@@ -36,14 +36,11 @@ Each step is executed in an isolated Docker container.
 ## Requirements
 
 ### Software
-- **Nextflow ≥ 22.04**
-- **Docker**
+- **Docker version 24.0.4**
 
 ### Verify installation
 ```bash
-nextflow -version
 docker --version
-docker info | head
 ```
 
 
@@ -53,12 +50,11 @@ docker info | head
 
 ```
 EOH_iontorrent/
-├── EOH_iontorrent_pipeline_light.nf
-├── nextflow.config
 └── params.json
 
 /path-to-reads/
 /path-to-refs/
+/outputdir/
 ```
 
 
@@ -254,14 +250,6 @@ Put in params.json
 
 ## Run the pipeline
 
-**nextflow version**
-
-```bash
-nextflow run EOH_iontorrent_pipeline_light.nf -params-file params.json -profile standard -c no_container.config
-```
-
-**docker version**
-
 ```bash
 docker run --rm -it -u 0:0 -v $(pwd):/work -v /MY/SAMPLE/DIR:/mnt/bioinfonas/ -w /work adipi71/eoh_mapping:latest
 ```
@@ -281,14 +269,16 @@ outdir/SAMPLE/
 ## Dockerfile of adipi71/eoh_mapping
 
 ```Dockerfile
-FROM continuumio/miniconda3:latest
-
+FROM continuumio/miniconda3:25.3.1-1
+# Pin Nextflow here (stable modern version; Java 17 friendly)
+ARG NXF_VER=25.10.2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget make gcc file \
     zlib1g-dev libbz2-dev libncurses5-dev \
     perl procps rsync ca-certificates \
+    openjdk-17-jre-headless \
   && rm -rf /var/lib/apt/lists/*
-
+# ---- samtools 0.1.19 + bcftools + vcfutils.pl ----
 RUN set -eux; \
     wget -O samtools-0.1.19.tar.bz2 "https://sourceforge.net/projects/samtools/files/samtools/0.1.19/samtools-0.1.19.tar.bz2/download"; \
     file samtools-0.1.19.tar.bz2; \
@@ -303,17 +293,42 @@ RUN set -eux; \
     install -m 0755 bcftools/vcfutils.pl /usr/local/bin/vcfutils.pl; \
     cd /; \
     rm -rf samtools-0.1.19 samtools-0.1.19.tar.bz2
-
+# ---- conda tools (no nextflow here) ----
 RUN set -eux; \
     conda config --system --add channels conda-forge; \
     conda config --system --add channels bioconda; \
     conda config --system --set channel_priority strict; \
-    conda install -y mash=2.3 bowtie2=2.5.4 nextflow; \
-    conda clean -a -y; \
-    which mash; which bowtie2; which nextflow; \
-    nextflow -version
-
+    conda config --system --remove channels defaults || true; \
+    conda create -y -n eoh \
+        python=3.11 \
+        mash=2.3 \
+        bowtie2=2.5.4; \
+    conda clean -a -y
+ENV PATH=/opt/conda/envs/eoh/bin:$PATH
 RUN pip install --no-cache-dir numpy biopython pandas xlrd
+# ---- Nextflow standalone distribution (pinned) ----
+# This is the "dist" nextflow executable. It should not trigger CAPSULE downloads like the conda launcher.
+RUN set -eux; \
+    wget -qO /usr/local/bin/nextflow \
+      "https://github.com/nextflow-io/nextflow/releases/download/v${NXF_VER}/nextflow"; \
+    chmod +x /usr/local/bin/nextflow; \
+    nextflow -version
+# ---- pipeline files ----
+WORKDIR /pipeline
+COPY EOH_iontorrent_pipeline_light.nf /pipeline/EOH_iontorrent_pipeline_light.nf
+COPY nextflow.config                  /pipeline/nextflow.config
+COPY entrypoint.sh                    /entrypoint.sh
+RUN chmod +x /entrypoint.sh \
+ && mkdir -p /work /tmp \
+ && chmod 1777 /tmp
+# Nextflow runtime dirs
+ENV NXF_VER=${NXF_VER} \
+    NXF_HOME=/work/.nextflow \
+    NXF_WORK=/work/work \
+    NXF_TEMP=/tmp \
+    NXF_ANSI_LOG=false
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
 
 ```
 
