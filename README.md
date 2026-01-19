@@ -112,12 +112,11 @@ The pipeline uses **MASH** to:
 ### Example
 ```json
 {
-  "reads_dir": "path-to-reads",
-  "refs_dir": "path-to-refs",
+  "reads_dir": "path/input/reads",
+  "refs_dir": "path/input/refs",
   "outdir": "results",
   "threads": 16,
   "memory_gb": 64,
-  "genus_species": "listeria_monocytogenes"
 }
 ```
 
@@ -251,8 +250,33 @@ Put in params.json
 ## Run the pipeline
 
 ```bash
-docker run --rm -it -u 0:0 -v $(pwd):/work -v /MY/SAMPLE/DIR:/mnt/bioinfonas/ -w /work adipi71/eoh_mapping:latest
+docker run -it -u 0:0 --rm \
+  -v /path/input/:/path/input/ \
+  -v $(pwd):/work \ 
+  adipi71/eoh_mapping:0.10 nextflow run /pipeline/EOH_iontorrent_pipeline_light.nf -params-file params.json
 ```
+or if you don't want to use the params.json file
+
+```bash
+docker run -it -u 0:0 --rm \
+  -v /path/input:/path/input/ \
+  -v $(pwd):/work \ 
+  adipi71/eoh_mapping:0.10  nextflow run  /pipeline/EOH_iontorrent_pipeline_light.nf \ 
+  --reads_dir /path/input/reads \
+  --refs_dir /path/input/listeria \
+  --outdir outdir \
+  --threds 16 --memory_gb 64 
+```
+
+### Explanation of the mounts
+
+| Option | Meaning |
+|------|--------|
+| `-v /path/input:/path/input/` | Makes input/output data visible inside the container |
+| `-v $(pwd):/work` | Stores Nextflow work directory and logs on the host |
+| `-u 0:0` | Runs as root (avoids permission issues) |
+| `--rm` | Removes the container when finished |
+
 
 ## Output Structure
 
