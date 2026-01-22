@@ -5,7 +5,8 @@ nextflow.enable.dsl = 2
 
 params.threads   = (params.threads ?: 8)    as int
 params.memory_gb = (params.memory_gb ?: 16) as int
-
+params.refs_dir = (params.refs_dir ?: null)
+params.refs_msh = (params.refs_msh ?: null)
 
 // ================== PROCESS ==================
 
@@ -107,6 +108,7 @@ process PREP_REF {
     basename == basename2
 
   script:
+  def refsDir = params.refs_dir ?: ''
   """
   set -euo pipefail
 
@@ -114,9 +116,21 @@ process PREP_REF {
   D=\$(cat ${best_dist_txt})
   echo "\$D" > best_dist.txt
 
+  # 1) Se REF è già un path valido, copialo direttamente
+  if [ -f "\$REF" ]; then
+    cp "\$REF" ref.fasta
+    exit 0
+  fi
+
+  # 2) Fallback: cerca per basename dentro refs_dir
+  if [ -z "${refsDir}" ]; then
+    echo "Cannot resolve ref '\$REF': file not found and refs_dir not provided" >&2
+    exit 1
+  fi
+
   BASE=\$(basename "\$REF")
-  REAL=\$(find "${params.refs_dir}" -type f -name "\$BASE" | head -n 1 || true)
-  [ -n "\$REAL" ] || { echo "Cannot resolve ref '\$REF' in ${params.refs_dir}" >&2; exit 1; }
+  REAL=\$(find "${refsDir}" -type f -name "\$BASE" | head -n 1 || true)
+  [ -n "\$REAL" ] || { echo "Cannot resolve ref '\$REF' in ${refsDir}" >&2; exit 1; }
 
   cp "\$REAL" ref.fasta
   """
@@ -221,7 +235,10 @@ workflow {
 
   if( !params.reads_dir ) error "Missing param: reads_dir (cartella con reads già trimmate)"
   if( !params.outdir )    error "Missing param: outdir"
-  if( !params.refs_dir  ) error "Missing param: refs_dir"
+  if( !params.refs_dir && !params.refs_msh )
+    error "Missing params: provide refs_dir (folder with FASTA refs) or refs_msh (precomputed .msh)"
+  if( params.refs_msh && !params.refs_dir )
+    error "Invalid params: refs_msh was provided but refs_dir is missing. Provide --refs_dir to resolve the chosen reference FASTA."
 
   def rpat = [
     "${params.reads_dir}/*.fastq.gz",
@@ -236,8 +253,15 @@ workflow {
     def basename = f.getBaseName().replaceAll(/(\.fastq|\.fq)(\.gz)?$/, '')
     [ basename, f ]
   }
+  def ch_refs_msh_val
 
-  // References
+  if( params.refs_msh ) {
+    ch_refs_msh_val = Channel
+      .fromPath(params.refs_msh, checkIfExists:true)
+      .first()
+  }
+  
+  else {
   def pats = [
     "${params.refs_dir}/*.fa",
     "${params.refs_dir}/*.fasta",
@@ -248,24 +272,27 @@ workflow {
   ]
 
   def chans = pats.collect { pat -> Channel.fromPath(pat, followLinks:true, checkIfExists:false) }
+
   def ch_ref_files = chans
-    .inject(Channel.empty()) { acc, ch -> acc.mix(ch) }
+    .drop(1)
+    .inject(chans[0]) { acc, ch -> acc.mix(ch) }
     .unique()
     .ifEmpty {
       error "No FASTA found directly under ${params.refs_dir}\nExpected one of:\n  - " + pats.join("\n  - ")
     }
 
   def ch_ref_files_list = ch_ref_files.collect()
+  ch_refs_msh_val = MASH_SKETCH_REFS(ch_ref_files_list).refs_msh.first()
+}
 
   // MASH choose ref
-  def ch_refs_msh_val = MASH_SKETCH_REFS(ch_ref_files_list).refs_msh.first()
   def ch_reads_msh    = MASH_SKETCH_READS(ch_reads).reads_msh
   def ch_dist         = MASH_DIST(ch_reads_msh, ch_refs_msh_val).dist
   def ch_picked       = PICK_REF(ch_dist)
   def ch_prep         = PREP_REF(ch_picked.chosen_ref_txt, ch_picked.best_dist_txt)
 
   // Mapping + consensus
-  def ch_sam      = BOWTIE2_ALIGN_SE( ch_reads.join(ch_prep.ref_fasta) )
-  def ch_samtools = SAMTOOLS_VCFUTILS_FASTQ(ch_sam)
+  def ch_sam       = BOWTIE2_ALIGN_SE( ch_reads.join(ch_prep.ref_fasta) )
+  def ch_samtools  = SAMTOOLS_VCFUTILS_FASTQ(ch_sam)
   def ch_consensus = FASTQ_TO_FASTA_SEQIO( ch_samtools ).consensus_fa
 }
