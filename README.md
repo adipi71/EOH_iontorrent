@@ -106,6 +106,22 @@ The pipeline uses **MASH** to:
 - compute distances between reads and references
 - select the **best reference per sample**
 
+### Optional: precomputed MASH sketch (refs_msh)
+
+If you run the pipeline multiple times using the same reference database, you can skip the reference sketching step by providing a precomputed MASH sketch file (.msh).
+
+Parameter
+
+refs_msh – path to a precomputed refs.msh file
+
+Important
+
+If refs_msh is provided, refs_dir is still required.
+The pipeline uses refs_dir to resolve and copy the selected reference FASTA after MASH selection.
+
+If you provide refs_msh without refs_dir, the pipeline will fail immediately with a clear error message.
+
+Typical location of the sketch produced by the pipeline:
 
 ## Configuration (`params.json`)
 
@@ -119,6 +135,18 @@ The pipeline uses **MASH** to:
   "memory_gb": 64,
 }
 ```
+with msh 
+
+```json
+{
+  "reads_dir": "path/input/reads",
+  "refs_dir": "path/input/refs",
+  "refs_msh": "path/input/refs.msh",
+  "outdir": "results",
+  "threads": 16,
+  "memory_gb": 64
+}
+```
 
 ### Parameter description
 
@@ -126,6 +154,7 @@ The pipeline uses **MASH** to:
 ||
 | `reads_dir` | Directory containing FASTQ reads |
 | `refs_dir` | Directory with candidate reference genomes |
+| `refs_msh`  | *(Optional)* Precomputed MASH sketch (`.msh`) to skip reference sketching (**requires `refs_dir`**) |
 | `outdir` | Output directory |
 | `threads` | Threads for multithreaded tools |
 | `memory_gb` | Memory allocation (GB) |
@@ -263,6 +292,7 @@ docker run -it -u 0:0 --rm \
   -v $(pwd):/work \ 
   adipi71/eoh_mapping:0.10  nextflow run  /pipeline/EOH_iontorrent_pipeline_light.nf \ 
   --reads_dir /path/input/reads \
+  --refs_msh  /path/input/refs.msh \
   --refs_dir /path/input/listeria \
   --outdir outdir \
   --threds 16 --memory_gb 64 
