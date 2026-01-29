@@ -42,6 +42,14 @@ RUN set -eux; \
       "https://github.com/nextflow-io/nextflow/releases/download/v${NXF_VER}/nextflow"; \
     chmod +x /usr/local/bin/nextflow; \
     nextflow -version
+################################################################
+######### DOWNLOAD version 2.1 of the pipeline from github #####
+################################################################
+RUN wget https://raw.githubusercontent.com/adipi71/EOH_iontorrent/refs/tags/2.1/EOH_iontorrent_pipeline_light.nf; \
+    wget https://raw.githubusercontent.com/adipi71/EOH_iontorrent/refs/tags/2.1/nextflow.config; \
+    wget https://raw.githubusercontent.com/adipi71/EOH_iontorrent/refs/tags/2.1/entrypoint.sh; 
+################################################################
+###############################################################
 # ---- pipeline files ----
 WORKDIR /pipeline
 COPY EOH_iontorrent_pipeline_light.nf /pipeline/EOH_iontorrent_pipeline_light.nf
